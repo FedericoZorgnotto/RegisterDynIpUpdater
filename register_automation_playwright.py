@@ -59,19 +59,18 @@ class RegisterDNSUpdater:
                 
                 for selector in cookie_selectors:
                     if page.is_visible(selector):
-                        print(f"Banner rilevato con selettore: '{selector}'. Clicco (force=True)...")
+                        print(f"Banner rilevato con selettore: '{selector}'. Clicco (force=True, timeout=3s)...")
                         try:
-                            page.click(selector, force=True)
-                            time.sleep(2.5) # Attesa animazione (aumentata per Linux)
+                            # Timeout ridotto per non bloccare tutto se il selettore è 'fake' o non cliccabile
+                            page.click(selector, force=True, timeout=3000)
+                            time.sleep(2.5) # Attesa animazione
                             
-                            # Verifica se è sparito davvero controllando il TESTO del banner
-                            # (A volte il bottone sparisce ma l'overlay resta)
                             if not page.is_visible("text=Questo sito utilizza cookies"):
                                 print("Banner sparito con successo (Testo non più visibile).")
                                 banner_dismissed = True
                                 break
                             else:
-                                print(f"Il banner sembra ancora lì (Testo visibile). Il click su '{selector}' non ha funzionato. Provo il prossimo...")
+                                print(f"Il banner sembra ancora lì (Testo visibile). Provo il prossimo...")
                         except Exception as click_err:
                             print(f"Errore click su {selector}: {click_err}")
                 
@@ -116,15 +115,18 @@ class RegisterDNSUpdater:
             print(f"Navigazione completata (o terminata). URL corrente: {current_url}")
             
             # DEBUG: V vediamo dove siamo finiti
+            print("Salvataggio screenshot post-login (debug_after_login.png)...")
             page.screenshot(path="debug_after_login.png")
+            print("Screenshot salvato.")
 
             # Se siamo ancora su welcome.html, il login è fallito
-            if "welcome.html" in current_url:
+            if "welcome.html" in current_url and "controlpanel" not in current_url:
+                # Nota: A volte redirige su controlpanel.register.it/ senza welcome
                 print("Login fallito: Rimasto sulla pagina di benvenuto.")
                 print("Controlla 'debug_after_login.png' per vedere se ci sono errori o captcha.")
                 return False
             else:
-                print("Login effettuato con successo!")
+                print("Login riuscito (URL diverso da welcome.html).")
                 return True
                 
         except Exception as e:
