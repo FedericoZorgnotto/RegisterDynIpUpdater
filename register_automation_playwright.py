@@ -76,19 +76,28 @@ class RegisterDNSUpdater:
                 with page.expect_navigation(timeout=40000, wait_until="domcontentloaded"):
                     page.keyboard.press("Enter")
             except Exception as nav_e:
-                print(f"Nota: la navigazione ha impiegato troppo tempo ({nav_e}). Controllo se il login è comunque riuscito...")
+                print(f"Nota: la navigazione ha impiegato troppo tempo ({nav_e}).")
+                print("Provo a cliccare il bottone 'Accedi' esplicitamente come fallback...")
+                try:
+                    page.click("button[type='submit']")
+                except:
+                   pass
 
             # Verifica Login
             current_url = page.url
             print(f"Navigazione completata (o terminata). URL corrente: {current_url}")
             
-            # Se siamo usciti dalla welcome page o siamo nel pannello, è un successo
-            if "welcome.html" not in current_url or "controlpanel" in current_url:
+            # DEBUG: V vediamo dove siamo finiti
+            page.screenshot(path="debug_after_login.png")
+
+            # Se siamo ancora su welcome.html, il login è fallito
+            if "welcome.html" in current_url:
+                print("Login fallito: Rimasto sulla pagina di benvenuto.")
+                print("Controlla 'debug_after_login.png' per vedere se ci sono errori o captcha.")
+                return False
+            else:
                 print("Login effettuato con successo!")
                 return True
-            else:
-                print("Login fallito o pagina non caricata. URL rimasto invariato.")
-                return False
                 
         except Exception as e:
             print(f"Si è verificato un errore critico durante il login: {e}")
