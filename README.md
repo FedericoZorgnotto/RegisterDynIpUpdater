@@ -1,102 +1,97 @@
 # RegisterDynIpUpdater
 
-Questo progetto utilizza il framework Python Selenium per automatizzare l'aggiornamento del DNS sul sito Register.it. Il
-codice agisce come un ddns, controllando l'ip pubblico della rete, si connette al sito Web, effettua il login con le
-credenziali fornite e accede alla sezione di gestione del DNS per modificare i record esistenti.
+Questo tool automatizza l'aggiornamento dei record DNS su [Register.it](https://register.it).  
+Agisce come un client DDNS: controlla il tuo IP pubblico attuale (usando Google DNS per evitare cache locali) e, se è cambiato, accede al pannello di controllo ed aggiorna i record A del tuo dominio.
 
-Questo progetto è utile per coloro che devono effettuare frequenti modifiche al loro DNS e vogliono automatizzare il
-processo per risparmiare tempo. Il codice è ben documentato e facile da seguire, rendendolo accessibile anche a utenti
-con conoscenze limitate di programmazione.
 
-Per utilizzare questo progetto, sarà necessario installare Selenium e alcune dipendenze, oltre a disporre di un account
-Register.it attivo e di credenziali valide
 
-Il programma riconoscerà in automatico quando l'ip è cambiato, la prima volta che verrà eseguito si eseguirà senza fare
-nessun controllo.
+## Requisiti
 
-ALLERTA SPOILER
-NON SONO UN PROGRAMMATORE - SE AVETE SUGGERIMENTI SUL MIGLIORAMENTO DEL CODICE CONTRIBUITE :)
+*   Python 3.8+
+*   Un account Register.it
+*   Ambiente Linux o Windows
 
-## Progetto di aggiornamento DNS con Python Selenium
+## Installazione
 
-Questo progetto utilizza il framework Python Selenium per automatizzare l'aggiornamento del DNS sul sito Register.it.
+1.  **Clona il repository:**
+    ```bash
+    git clone https://github.com/FedericoZorgnotto/RegisterDynIpUpdater.git
+    cd RegisterDynIpUpdater
+    ```
 
-### Requisiti
+2.  **Crea un Virtual Environment (Raccomandato):**
+    ```bash
+    python -m venv .venv
+    # Windows
+    .venv\Scripts\activate
+    # Linux/Mac
+    source .venv/bin/activate
+    ```
 
-* Un account Register.it attivo e credenziali valide
-* Python 3.x installato sul sistema
-* Pip3 installato sul sistema
-* Browser Web compatibile con Selenium (es. Google Chrome o Mozilla Firefox)
-* Driver per il browser Web (es. Chromedriver per Google Chrome o Geckodriver per Mozilla Firefox)
+3.  **Installa le dipendenze:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### Installazione
+4.  **Installa il browser per Playwright:**
+    ```bash
+    playwright install firefox
+    ```
 
-1. Clona questo repository sul tuo sistema
+## Configurazione
 
+Crea un file `.env` nella cartella principale (puoi copiare `.env.example`).  
+Inserisci le tue credenziali:
+
+```ini
+EMAIL="tua_email@esempio.com"
+PASSWORD="tua_password"
+DOMINIO="tuodominio.it"
+HEADLESS=True
 ```
-git clone https://github.com/lorenzotarchi/RegisterDynIpUpdater.git
-```
 
-2. Installa le dipendenze necessarie con pip3
-
-```
-pip3 install -r requirements.txt
-```
-
-3. **Scarica il driver del browser**
-
-    - **Per Chrome:** scarica [Chromedriver](https://chromedriver.chromium.org/) e posizionalo nella **stessa cartella
-      del progetto**.
-    - **Per Firefox:** scarica [Geckodriver](https://github.com/mozilla/geckodriver/releases) e assicurati che sia **nel
-      PATH di sistema** oppure **nella cartella del progetto**.
+*   `HEADLESS=True`: Il browser lavora in background (invisibile). Metti `False` se vuoi vedere cosa fa (utile per debug).
+*   `DOMINIO`: Il dominio principale (es. `example.com`). Lo script aggiornerà sia il dominio radice che il sottodominio `mail`.
 
 ## Utilizzo
 
-### Configurazione
+Per avviare il controllo manuale (o testare se funziona):
 
-Prima di utilizzare il programma dovremo andare a modificare il file di configurazione (.env), copiando il file
-.env.example e rinominandolo in .env.
-
-#### Utenti windows
-
-Una volta modificato il file avvieremo il programma con python3 :
-
-```
-python3 regi-DnsUpdater-Windows.py
+```bash
+python main.py
 ```
 
-#### Utenti Linux
+Se l'IP è cambiato, vedrai i log del login e dell'aggiornamento. Se è uguale, lo script terminerà subito.
 
-Per gli utenti linux il programma si avviera in modalita nascosta se si vuol vedere il browser modificare la linea 73
-mettendo visible=100.
+## Automazione
 
-```
-python3 regi-DnsUpdater-Linux.py
-```
+### Linux (Servizio Automatico)
 
-### Automatizzare il propgramma
+Ho incluso uno script per installare facilmente il tool come servizio di sistema (systemd). Si avvierà al boot e girerà periodicamente.
 
-Comandi per automatizzare il tutto in background.
+1.  **Installa il servizio (es. ogni ora):**
+    ```bash
+    sudo python service_manager.py install --interval 1h
+    ```
 
-#### Utenti Linux
+2.  **Controlla che giri:**
+    ```bash
+    systemctl status register-ip-updater.timer
+    ```
 
-Ogni 30 minuti esegue lo script.
+3.  **Disinstalla:**
+    ```bash
+    sudo python service_manager.py uninstall
+    ```
 
-Anche in questo caso dovranno essere modificate le path del file e del file "RegisterDynIpUpdater.log"
+### Windows
 
-```
-crontab -e
+Puoi usare l'**Utilità di pianificazione (Task Scheduler)** di Windows:
+1.  Crea una nuova attività "Base".
+2.  Azione: Avvio programma -> Seleziona `python.exe` (trova il percorso con `where python`).
+3.  Argomenti: il percorso completo di `main.py` (es. `C:\Users\Nome\Desktop\RegisterDynIpUpdater\main.py`).
+4.  Imposta la pianificazione (es. ogni ora).
 
-*/30 * * * * export DISPLAY=:0 && export PATH=$PATH:/usr/local/bin && /usr/bin/python3 /home/PC/regi-DnsUpdater-Linux.py >> /home/PC/RegisterDynIpUpdater.log 2>&1
-```
+---
 
-#### Utenti Windows
 
-Per gli utenti Windows sarà necessario aprire il programma "Utilità di pianificazione (Windows Task Scheduler)" e
-configurare una nuova attività.
-Potrebbe essere utile a questo punto disabilitare la visualizzazione della scheda chrome del programma aggiungendo un
-comando sotto la linea 14
-
-```
-chrome_options.add_argument('headless')
-```

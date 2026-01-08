@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 
 class RegisterDNSUpdater:
     
-    def __init__(self, email, password, domain="zorgnotto.it", headless=False):
+    def __init__(self, email, password, domain="example.com", headless=False):
         self.email = email
         self.password = password
         self.domain = domain
