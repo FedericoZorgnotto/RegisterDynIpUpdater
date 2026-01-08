@@ -58,8 +58,9 @@ class RegisterDNSUpdater:
                     if page.is_visible(selector):
                         print(f"Banner rilevato: '{selector}'. Tentativo click JS...")
                         try:
-                            # Usa JS puro per cliccare, bypassando i check di Playwright che vanno in timeout
-                            page.evaluate(f"document.querySelector('{selector}') && document.querySelector('{selector}').click()")
+                            # Usa il locator di Playwright per risolvere il selettore (supporta text=...)
+                            # Poi usa evaluate per cliccare via JS sull'elemento trovato
+                            page.locator(selector).first.evaluate("node => node.click()")
                             time.sleep(2.5)
                             
                             # Verifica se il testo del banner è sparito
@@ -150,11 +151,14 @@ class RegisterDNSUpdater:
             for sel in popup_selectors:
                 if page.is_visible(sel):
                     print(f"Popup rilevato ({sel}). Chiudo via JS...")
-                    page.evaluate(f"document.querySelector('{sel}') && document.querySelector('{sel}').click()")
-                    time.sleep(2)
-                    if not page.is_visible(sel):
-                        print("Popup chiuso.")
-                        break
+                    try:
+                        page.locator(sel).first.evaluate("node => node.click()")
+                        time.sleep(2)
+                        if not page.is_visible(sel):
+                            print("Popup chiuso.")
+                            break
+                    except Exception as e:
+                         print(f"Errore chiusura popup JS ({sel}): {e}")
             
             self._safe_screenshot("debug_after_popup.png")
 
