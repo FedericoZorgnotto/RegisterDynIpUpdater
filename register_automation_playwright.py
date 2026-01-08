@@ -139,11 +139,16 @@ class RegisterDNSUpdater:
         page = self.page
         try:
             # Gestione potenziale popup 2FA/Promo
+            print("Attendo 3s per caricamento eventuali popup...")
+            time.sleep(3)
+            page.screenshot(path="debug_before_popup.png")
+            
             print("Controllo eventuali popup (2FA/Promo)...")
             try:
                 # Elenco possibili selettori per chiudere il popup
                 popup_selectors = [
-                    "text=Non ora",                # Testo semplice
+                    "text=Non ora",                # Testo semplice (spesso funziona)
+                    "a:has-text('Non ora')",       # Link esplicito
                     "button:has-text('Non ora')",  # Bottone specifico
                     "div.modal-footer button.btn-secondary", # Bottone secondario footer modal
                     "button.close",                # X in alto a destra standard
@@ -153,14 +158,23 @@ class RegisterDNSUpdater:
                 popup_found = False
                 for sel in popup_selectors:
                     if page.is_visible(sel):
-                        print(f"Popup rilevato ({sel}). Chiudo...")
-                        page.click(sel)
-                        popup_found = True
-                        time.sleep(2) # Attesa chiusura animazione
-                        break
+                        print(f"Popup rilevato ({sel}). Chiudo (force=True)...")
+                        try:
+                            page.click(sel, force=True)
+                            popup_found = True
+                            time.sleep(2) # Attesa chiusura animazione
+                            if not page.is_visible(sel):
+                                print("Popup chiuso con successo.")
+                                break
+                            else:
+                                print("Popup ancora visibile, provo prossimo selettore...")
+                        except:
+                            pass
                 
                 if not popup_found:
-                    print("Nessun popup bloccante rilevato.")
+                    print("Nessun popup bloccante rilevato al momento del controllo.")
+                
+                page.screenshot(path="debug_after_popup.png")
                     
             except Exception as e:
                 print(f"Errore controllo popup (non bloccante): {e}")
