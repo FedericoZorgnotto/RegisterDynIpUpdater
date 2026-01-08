@@ -43,37 +43,42 @@ class RegisterDNSUpdater:
             print(f"Titolo pagina: {page.title()}")
             
             # Banner Cookie
-            print("Gestione Banner Cookie...")
+            # Banner Cookie
+            print("Gestione Banner Cookie (Tentativo robusto)...")
             try:
-                # Strategia a cascata per il banner
-                cookie_accepted = False
+                # Elenco possibili selettori per il bottone "Accetta"
+                cookie_selectors = [
+                    "button.iubenda-cs-accept-btn",  # ID specifico Iubenda
+                    "button.iubenda-cs-btn-primary", # Altra classe comune
+                    "text=Accetta",                  # Testo italiano
+                    "text=Accept",                   # Testo inglese
+                    "text=Consent",                  # Testo inglese alt
+                ]
                 
-                # 1. Selettore classe specifico (Iubenda)
-                if page.is_visible("button.iubenda-cs-accept-btn"):
-                    print("Banner trovato (Class). Clicco...")
-                    page.click("button.iubenda-cs-accept-btn")
-                    cookie_accepted = True
+                banner_dismissed = False
                 
-                # 2. Selettore testo "Accetta" (Fallback comune)
-                elif page.is_visible("text=Accetta"):
-                    print("Banner trovato (Testo 'Accetta'). Clicco...")
-                    page.click("text=Accetta")
-                    cookie_accepted = True
-
-                # 3. Selettore testo "Accept" (Fallback inglese)
-                elif page.is_visible("text=Accept"):
-                    print("Banner trovato (Testo 'Accept'). Clicco...")
-                    page.click("text=Accept")
-                    cookie_accepted = True
+                for selector in cookie_selectors:
+                    if page.is_visible(selector):
+                        print(f"Banner rilevato con selettore: '{selector}'. Clicco (force=True)...")
+                        try:
+                            page.click(selector, force=True)
+                            time.sleep(1.5) # Attesa animazione
+                            
+                            # Verifica se è sparito
+                            if not page.is_visible(selector):
+                                print("Banner sparito con successo.")
+                                banner_dismissed = True
+                                break
+                            else:
+                                print("Il banner sembra ancora lì. Provo il prossimo selettore...")
+                        except Exception as click_err:
+                            print(f"Errore click su {selector}: {click_err}")
                 
-                if cookie_accepted:
-                    print("Click effettuato. Attendo sparizione overlay...")
-                    time.sleep(2)
-                else:
-                    print("Nessun banner rilevato (o selettori non validi).")
-
+                if not banner_dismissed:
+                    print("ATTENZIONE: Il banner cookie potrebbe essere ancora attivo.")
+                
             except Exception as e:
-                print(f"Errore nella gestione cookie (non bloccante): {e}")
+                print(f"Errore generico gestione cookie: {e}")
 
             # Modulo di Login
             print("Inserimento credenziali...")
