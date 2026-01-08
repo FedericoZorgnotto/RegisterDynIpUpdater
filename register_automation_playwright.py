@@ -38,7 +38,7 @@ class RegisterDNSUpdater:
             page.goto('https://controlpanel.register.it/welcome.html')
             
             # DEBUG: Screenshot iniziale
-            self._safe_screenshot("debug_entry.png")
+            # self._safe_screenshot("debug_entry.png") # Rimosso per ottimizzazione
             print(f"Titolo pagina: {page.title()}")
             
             # Banner Cookie
@@ -102,7 +102,7 @@ class RegisterDNSUpdater:
 
             # Verifica Login
             print("Verifica stato login...")
-            self._safe_screenshot("debug_after_login.png")
+            # Screenshot rimosso dal main path per evitare hang su dashboard pesanti
 
             # Controllo Elementi Dashboard
             if page.is_visible("text=Esci") or page.is_visible(".user-info") or page.is_visible("#main-menu"):
@@ -112,12 +112,14 @@ class RegisterDNSUpdater:
             # Controllo Form Login (fallimento sicuro)
             if page.is_visible("input[name='userName']"):
                  print("Login fallito: Form di login ancora visibile.")
+                 self._safe_screenshot("debug_login_fail_form.png")
                  return False
 
             # Check URL (fallback)
             current_url = page.url
             if "welcome.html" in current_url:
                 print("Login fallito: Ancora su welcome.html")
+                self._safe_screenshot("debug_login_fail_welcome.png")
                 return False
                 
             print(f"Login apparentemente riuscito (URL: {current_url}).")
@@ -138,7 +140,7 @@ class RegisterDNSUpdater:
             # Gestione potenziale popup 2FA
             print("Attendo 3s per popup 2FA/Promo...")
             time.sleep(3)
-            self._safe_screenshot("debug_before_popup.png")
+            # self._safe_screenshot("debug_before_popup.png")
             
             print("Controllo e chiusura popup...")
             popup_selectors = [
@@ -160,7 +162,7 @@ class RegisterDNSUpdater:
                     except Exception as e:
                          print(f"Errore chiusura popup JS ({sel}): {e}")
             
-            self._safe_screenshot("debug_after_popup.png")
+            # self._safe_screenshot("debug_after_popup.png")
 
             print(f"Selezione dominio '{self.domain}'...")
             try:
