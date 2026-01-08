@@ -43,15 +43,37 @@ class RegisterDNSUpdater:
             print(f"Titolo pagina: {page.title()}")
             
             # Banner Cookie
+            print("Gestione Banner Cookie...")
             try:
-                # Attende brevemente il banner dei cookie
-                cookie_btn = page.wait_for_selector("button.iubenda-cs-accept-btn", timeout=5000)
-                if cookie_btn:
-                    print("Banner cookie trovato. Clicco...")
-                    cookie_btn.click()
-                    time.sleep(1)
-            except Exception:
-                print("Banner cookie non trovato o timeout.")
+                # Strategia a cascata per il banner
+                cookie_accepted = False
+                
+                # 1. Selettore classe specifico (Iubenda)
+                if page.is_visible("button.iubenda-cs-accept-btn"):
+                    print("Banner trovato (Class). Clicco...")
+                    page.click("button.iubenda-cs-accept-btn")
+                    cookie_accepted = True
+                
+                # 2. Selettore testo "Accetta" (Fallback comune)
+                elif page.is_visible("text=Accetta"):
+                    print("Banner trovato (Testo 'Accetta'). Clicco...")
+                    page.click("text=Accetta")
+                    cookie_accepted = True
+
+                # 3. Selettore testo "Accept" (Fallback inglese)
+                elif page.is_visible("text=Accept"):
+                    print("Banner trovato (Testo 'Accept'). Clicco...")
+                    page.click("text=Accept")
+                    cookie_accepted = True
+                
+                if cookie_accepted:
+                    print("Click effettuato. Attendo sparizione overlay...")
+                    time.sleep(2)
+                else:
+                    print("Nessun banner rilevato (o selettori non validi).")
+
+            except Exception as e:
+                print(f"Errore nella gestione cookie (non bloccante): {e}")
 
             # Modulo di Login
             print("Inserimento credenziali...")
