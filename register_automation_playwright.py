@@ -62,15 +62,16 @@ class RegisterDNSUpdater:
                         print(f"Banner rilevato con selettore: '{selector}'. Clicco (force=True)...")
                         try:
                             page.click(selector, force=True)
-                            time.sleep(1.5) # Attesa animazione
+                            time.sleep(2.5) # Attesa animazione (aumentata per Linux)
                             
-                            # Verifica se è sparito
-                            if not page.is_visible(selector):
-                                print("Banner sparito con successo.")
+                            # Verifica se è sparito davvero controllando il TESTO del banner
+                            # (A volte il bottone sparisce ma l'overlay resta)
+                            if not page.is_visible("text=Questo sito utilizza cookies"):
+                                print("Banner sparito con successo (Testo non più visibile).")
                                 banner_dismissed = True
                                 break
                             else:
-                                print("Il banner sembra ancora lì. Provo il prossimo selettore...")
+                                print(f"Il banner sembra ancora lì (Testo visibile). Il click su '{selector}' non ha funzionato. Provo il prossimo...")
                         except Exception as click_err:
                             print(f"Errore click su {selector}: {click_err}")
                 
