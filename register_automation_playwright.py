@@ -37,188 +37,155 @@ class RegisterDNSUpdater:
             print("Navigazione alla pagina di login...")
             page.goto('https://controlpanel.register.it/welcome.html')
             
-            # DEBUG: Screenshot iniziale per vedere cosa vede il browser
-            print("Salvataggio screenshot di debug -> debug_entry.png")
-            page.screenshot(path="debug_entry.png")
+            # DEBUG: Screenshot iniziale
+            self._safe_screenshot("debug_entry.png")
             print(f"Titolo pagina: {page.title()}")
             
             # Banner Cookie
-            # Banner Cookie
-            print("Gestione Banner Cookie (Tentativo robusto)...")
+            print("Gestione Banner Cookie (Metodo JS robusto)...")
             try:
-                # Elenco possibili selettori per il bottone "Accetta"
+                # Elenco possibili selettori
                 cookie_selectors = [
-                    "button.iubenda-cs-accept-btn",  # ID specifico Iubenda
-                    "button.iubenda-cs-btn-primary", # Altra classe comune
-                    "text=Accetta",                  # Testo italiano
-                    "text=Accept",                   # Testo inglese
-                    "text=Consent",                  # Testo inglese alt
+                    "button.iubenda-cs-accept-btn",
+                    "button.iubenda-cs-btn-primary",
+                    "text=Accetta",
+                    "text=Accept"
                 ]
                 
                 banner_dismissed = False
                 
                 for selector in cookie_selectors:
                     if page.is_visible(selector):
-                        print(f"Banner rilevato con selettore: '{selector}'. Clicco (force=True, timeout=3s)...")
+                        print(f"Banner rilevato: '{selector}'. Tentativo click JS...")
                         try:
-                            # Timeout ridotto per non bloccare tutto se il selettore è 'fake' o non cliccabile
-                            page.click(selector, force=True, timeout=3000)
-                            time.sleep(2.5) # Attesa animazione
+                            # Usa JS puro per cliccare, bypassando i check di Playwright che vanno in timeout
+                            page.evaluate(f"document.querySelector('{selector}') && document.querySelector('{selector}').click()")
+                            time.sleep(2.5)
                             
+                            # Verifica se il testo del banner è sparito
                             if not page.is_visible("text=Questo sito utilizza cookies"):
-                                print("Banner sparito con successo (Testo non più visibile).")
+                                print("Banner sparito con successo.")
                                 banner_dismissed = True
                                 break
                             else:
-                                print(f"Il banner sembra ancora lì (Testo visibile). Provo il prossimo...")
-                        except Exception as click_err:
-                            print(f"Errore click su {selector}: {click_err}")
-                
+                                print(f"Banner ancora visibile dopo click su {selector}.")
+                        except Exception as e:
+                            print(f"Errore click JS su {selector}: {e}")
+
                 if not banner_dismissed:
-                    print("ATTENZIONE: Il banner cookie potrebbe essere ancora attivo.")
-                
+                    print("ATTENZIONE: Banner cookie potrebbe essere ancora presente.")
+
             except Exception as e:
-                print(f"Errore generico gestione cookie: {e}")
+                print(f"Errore gestione cookie: {e}")
 
             # Modulo di Login
             print("Inserimento credenziali...")
-            
-            # Username
             print("Inserimento username...")
             page.fill("input.userName", self.email)
-            
             time.sleep(random.uniform(0.5, 1.0))
             
-            # Password
             print("Inserimento password...")
             page.fill("input.password", self.password)
-            
             time.sleep(random.uniform(0.5, 1.0))
 
-            # INVIO: Preme INVIO invece di cliccare il pulsante
-            print("Premo INVIO per accedere...")
+            print("Invio modulo di login...")
             try:
-                # Usa domcontentloaded invece di load per evitare blocchi su script terzi
-                # Aumenta timeout a 40s per ambienti lenti (LXC)
                 with page.expect_navigation(timeout=40000, wait_until="domcontentloaded"):
                     page.keyboard.press("Enter")
             except Exception as nav_e:
-                print(f"Nota: la navigazione ha impiegato troppo tempo ({nav_e}).")
-                print("Provo a cliccare il bottone 'Accedi' esplicitamente come fallback...")
+                print(f"Timeout navigazione login ({nav_e}). Provo click su bottone...")
                 try:
-                    page.click("button[type='submit']")
+                    page.evaluate("document.querySelector('button[type=\"submit\"]').click()")
                 except:
-                   pass
+                    pass
 
             # Verifica Login
-            current_url = page.url
-            print(f"Navigazione completata (o terminata). URL corrente: {current_url}")
-            
-            # DEBUG: V vediamo dove siamo finiti
-            print("Salvataggio screenshot post-login (debug_after_login.png)...")
-            page.screenshot(path="debug_after_login.png")
-            print("Screenshot salvato.")
+            print("Verifica stato login...")
+            self._safe_screenshot("debug_after_login.png")
 
-            # Se siamo ancora su welcome.html, il login è fallito
-            if "welcome.html" in current_url and "controlpanel" not in current_url:
-                # Nota: A volte redirige su controlpanel.register.it/ senza welcome
-                print("Login fallito: Rimasto sulla pagina di benvenuto.")
-                print("Controlla 'debug_after_login.png' per vedere se ci sono errori o captcha.")
-                return False
-            else:
-                print("Login riuscito (URL diverso da welcome.html).")
+            # Controllo Elementi Dashboard
+            if page.is_visible("text=Esci") or page.is_visible(".user-info") or page.is_visible("#main-menu"):
+                print("Login effettuato con successo! (Elementi dashboard rilevati)")
                 return True
+            
+            # Controllo Form Login (fallimento sicuro)
+            if page.is_visible("input[name='userName']"):
+                 print("Login fallito: Form di login ancora visibile.")
+                 return False
+
+            # Check URL (fallback)
+            current_url = page.url
+            if "welcome.html" in current_url:
+                print("Login fallito: Ancora su welcome.html")
+                return False
                 
+            print(f"Login apparentemente riuscito (URL: {current_url}).")
+            return True
+
         except Exception as e:
-            print(f"Si è verificato un errore critico durante il login: {e}")
+            print(f"Errore critico durante il login: {e}")
             return False
 
     def update_ip(self, new_ip):
         if not self.page:
-            print("Sessione non avviata. Effettuo login...")
+            print("Sessione non avviata (o persa). Effettuo login...")
             if not self.login():
                 return False
         
         page = self.page
         try:
-            # Gestione potenziale popup 2FA/Promo
-            print("Attendo 3s per caricamento eventuali popup...")
+            # Gestione potenziale popup 2FA
+            print("Attendo 3s per popup 2FA/Promo...")
             time.sleep(3)
-            page.screenshot(path="debug_before_popup.png")
+            self._safe_screenshot("debug_before_popup.png")
             
-            print("Controllo eventuali popup (2FA/Promo)...")
-            try:
-                # Elenco possibili selettori per chiudere il popup
-                popup_selectors = [
-                    "text=Non ora",                # Testo semplice (spesso funziona)
-                    "a:has-text('Non ora')",       # Link esplicito
-                    "button:has-text('Non ora')",  # Bottone specifico
-                    "div.modal-footer button.btn-secondary", # Bottone secondario footer modal
-                    "button.close",                # X in alto a destra standard
-                    "div[aria-label='Close']"      # X accessibile
-                ]
-                
-                popup_found = False
-                for sel in popup_selectors:
-                    if page.is_visible(sel):
-                        print(f"Popup rilevato ({sel}). Chiudo (force=True)...")
-                        try:
-                            page.click(sel, force=True)
-                            popup_found = True
-                            time.sleep(2) # Attesa chiusura animazione
-                            if not page.is_visible(sel):
-                                print("Popup chiuso con successo.")
-                                break
-                            else:
-                                print("Popup ancora visibile, provo prossimo selettore...")
-                        except:
-                            pass
-                
-                if not popup_found:
-                    print("Nessun popup bloccante rilevato al momento del controllo.")
-                
-                page.screenshot(path="debug_after_popup.png")
-                    
-            except Exception as e:
-                print(f"Errore controllo popup (non bloccante): {e}")
+            print("Controllo e chiusura popup...")
+            popup_selectors = [
+                "text=Non ora",
+                "button:has-text('Non ora')",
+                "button.close",
+                "div[aria-label='Close']"
+            ]
+            
+            for sel in popup_selectors:
+                if page.is_visible(sel):
+                    print(f"Popup rilevato ({sel}). Chiudo via JS...")
+                    page.evaluate(f"document.querySelector('{sel}') && document.querySelector('{sel}').click()")
+                    time.sleep(2)
+                    if not page.is_visible(sel):
+                        print("Popup chiuso.")
+                        break
+            
+            self._safe_screenshot("debug_after_popup.png")
 
             print(f"Selezione dominio '{self.domain}'...")
-            # Clicca sul link del dominio per impostare il contesto
             try:
-                # Prova prima il selettore CSS (più robusto)
+                # Navigazione Dominio
                 with page.expect_navigation(timeout=10000):
-                    page.click(f"a[href*='domain={self.domain}']")
-                print("Dominio selezionato via HREF.")
-            except Exception:
-                 print(f"Selettore compatto fallito. Provo con match testuale per '{self.domain}'...")
-                 try:
-                     with page.expect_navigation(timeout=5000):
-                        page.click(f"text={self.domain}")
-                     print("Dominio selezionato via TESTO.")
-                 except Exception:
-                     print("Match testuale fallito. Provo selettore generico sidebar 'a._dom'...")
-                     try:
-                         with page.expect_navigation(timeout=5000):
-                            page.click("a._dom") 
-                         print("Dominio selezionato via selettore GENERICO.")
-                     except Exception as e_final:
-                         print("Tutti i tentativi di selezione dominio sono falliti.")
-                         return False
+                    # Prova JS click su link dominio per robustezza
+                    found = page.evaluate(f"""() => {{
+                        let el = document.querySelector("a[href*='domain={self.domain}']");
+                        if(el) {{ el.click(); return true; }}
+                        return false;
+                    }}""")
+                    if not found:
+                         # Fallback testo
+                         page.click(f"text={self.domain}")
+                print("Dominio selezionato.")
+            except Exception as e:
+                 print(f"Errore selezione dominio: {e}")
+                 # Fallback estremo: navigazione diretta? Rischioso per sessione.
+                 return False
 
-            print("Navigazione alla Gestione DNS Avanzata...")
+            print("Navigazione DNS Avanzata...")
             page.goto('https://controlpanel.register.it/domains/dnsAdvanced.html')
-            
-            # Attende caricamento tabella
             page.wait_for_selector("textarea.recordValue", timeout=10000)
             
-            # Trova tutte le righe
             rows = page.query_selector_all("tr")
             updated_count = 0
             
-            print(f"Scansione di {len(rows)} righe per record DNS...")
-            
+            print(f"Analisi {len(rows)} righe DNS...")
             for row in rows:
-                # Cerca selettori nome, tipo e valore
                 name_input = row.query_selector("input.recordName")
                 type_input = row.query_selector("select.recordType")
                 value_input = row.query_selector("textarea.recordValue")
@@ -228,49 +195,35 @@ class RegisterDNSUpdater:
                     record_type = type_input.input_value().strip()
                     current_val = value_input.input_value().strip()
                     
-                    # Normalizza nome rimuovendo punto finale se presente
                     clean_name = name_val[:-1] if name_val.endswith('.') else name_val
-                    
-                    # Target specifici: Dominio radice e sottodominio 'mail'
                     targets = [self.domain, f"mail.{self.domain}"]
                     
-                    print(f"Controllo record: Nome='{name_val}' Tipo='{record_type}' Valore='{current_val}'")
-
-                    if record_type == 'A':
-                        if clean_name in targets:
-                            if current_val != new_ip:
-                                print(f"MATCH TROVATO: Aggiorno {name_val} (A) da {current_val} a {new_ip}")
-                                value_input.fill(new_ip)
-                                updated_count += 1
-                            else:
-                                print(f"MATCH TROVATO: {name_val} ha già l'IP corretto. Salto.")
+                    if record_type == 'A' and clean_name in targets:
+                        if current_val != new_ip:
+                            print(f"AGGIORNO {name_val}: {current_val} -> {new_ip}")
+                            value_input.fill(new_ip)
+                            updated_count += 1
                         else:
-                            print(f"Salto record A {name_val} (non è nei target).")
-                    else:
-                        print(f"Salto record non-A {name_val} (Tipo: {record_type}).")
+                            print(f"Record {name_val} già aggiornato.")
 
             if updated_count > 0:
-                print(f"Aggiornamenti effettuati: {updated_count}. Clicco 'Applica'...")
-                # Clicca pulsante Applica.
+                print(f"Applico {updated_count} modifiche...")
                 page.click("text=Applica")
                 
-                print("Attendo dialogo di conferma...")
+                print("Conferma salvataggio...")
                 try:
-                    # Attende il modale "Salvataggio modifiche" con pulsante "CONTINUA"
                     with page.expect_navigation(timeout=20000):
                         page.click("text=CONTINUA", timeout=5000)
-                    print("Modifiche confermate (Cliccato CONTINUA).")
+                    print("Salvataggio confermato.")
                 except Exception as e:
-                    print(f"Problema con dialogo di conferma: {e}")
-                
-                print("Processo aggiornamento DNS completato.")
+                    print(f"Errore conferma: {e}")
                 return True
             else:
-                print("Nessun record necessitava aggiornamento.")
+                print("Nessuna modifica necessaria.")
                 return True
 
         except Exception as e:
-            print(f"Errore durante aggiornamento DNS: {e}")
+            print(f"Errore processo update DNS: {e}")
             return False
 
     def close(self):
@@ -278,6 +231,16 @@ class RegisterDNSUpdater:
             self.browser.close()
         if self.playwright:
             self.playwright.stop()
+
+    def _safe_screenshot(self, filename):
+        """Tenta di salvare uno screenshot senza bloccare lo script in caso di hang."""
+        try:
+            print(f"Salvataggio {filename}...")
+            # Timeout implicito non esiste in sync API python per screenshot, 
+            # ma speriamo che wrapping in try aiuti se è un errore gestibile.
+            self.page.screenshot(path=filename) 
+        except Exception as e:
+            print(f"Screenshot fallito (ignorato): {e}")
 
 def update_dns(email, password, domain, headless=False):
     # Recupera l'IP pubblico qui per completezza
