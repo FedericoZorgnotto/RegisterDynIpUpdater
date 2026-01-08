@@ -37,6 +37,11 @@ class RegisterDNSUpdater:
             print("Navigazione alla pagina di login...")
             page.goto('https://controlpanel.register.it/welcome.html')
             
+            # DEBUG: Screenshot iniziale per vedere cosa vede il browser
+            print("Salvataggio screenshot di debug -> debug_entry.png")
+            page.screenshot(path="debug_entry.png")
+            print(f"Titolo pagina: {page.title()}")
+            
             # Banner Cookie
             try:
                 # Attende brevemente il banner dei cookie
