@@ -139,16 +139,31 @@ class RegisterDNSUpdater:
         page = self.page
         try:
             # Gestione potenziale popup 2FA/Promo
+            print("Controllo eventuali popup (2FA/Promo)...")
             try:
-                # Controllo breve se appare il popup
-                print("Controllo eventuali popup...")
-                # Selettore per 'Non ora'
-                if page.is_visible("text=Non ora", timeout=3000):
-                    print("Chiudo popup 2FA...")
-                    page.click("text=Non ora")
-                    time.sleep(1)
-            except:
-                pass
+                # Elenco possibili selettori per chiudere il popup
+                popup_selectors = [
+                    "text=Non ora",                # Testo semplice
+                    "button:has-text('Non ora')",  # Bottone specifico
+                    "div.modal-footer button.btn-secondary", # Bottone secondario footer modal
+                    "button.close",                # X in alto a destra standard
+                    "div[aria-label='Close']"      # X accessibile
+                ]
+                
+                popup_found = False
+                for sel in popup_selectors:
+                    if page.is_visible(sel):
+                        print(f"Popup rilevato ({sel}). Chiudo...")
+                        page.click(sel)
+                        popup_found = True
+                        time.sleep(2) # Attesa chiusura animazione
+                        break
+                
+                if not popup_found:
+                    print("Nessun popup bloccante rilevato.")
+                    
+            except Exception as e:
+                print(f"Errore controllo popup (non bloccante): {e}")
 
             print(f"Selezione dominio '{self.domain}'...")
             # Clicca sul link del dominio per impostare il contesto
