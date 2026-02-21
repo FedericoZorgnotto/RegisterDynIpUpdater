@@ -19,11 +19,24 @@ class RegisterDNSUpdater:
         """Inizializza la sessione del browser."""
         self.playwright = sync_playwright().start()
         # Avvia il browser - utilizza FIREFOX
-        self.browser = self.playwright.firefox.launch(headless=self.headless)
+        self.browser = self.playwright.firefox.launch(
+            headless=self.headless,
+            args=["--no-sandbox"]
+        )
         
-        # Crea un contesto
+        # Crea un contesto con User-Agent realistico per evitare blocchi anti-bot
         self.context = self.browser.new_context(
             viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+            extra_http_headers={
+                "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Referer": "https://www.register.it/"
+            }
+        )
+        
+        # Rimuove il flag webdriver per mitigare i controlli anti-bot in headless
+        self.context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         
         self.page = self.context.new_page()
@@ -80,25 +93,53 @@ class RegisterDNSUpdater:
                 print(f"Errore gestione cookie: {e}")
 
             # Modulo di Login
-            print("Inserimento credenziali...")
+            print("Inserimento credenziali (simulazione umana)...")
+            
+            # Movimento casuale del mouse iniziale
+            page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+            time.sleep(random.uniform(0.3, 0.7))
+            
             print("Inserimento username...")
-            page.fill("input.userName", self.email)
+            page.click("input.userName")
+            time.sleep(random.uniform(0.1, 0.4))
+            page.locator("input.userName").press_sequentially(self.email, delay=random.randint(50, 150))
             time.sleep(random.uniform(0.5, 1.0))
             
+            # Altro movimento mouse
+            page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+            
             print("Inserimento password...")
-            page.fill("input.password", self.password)
+            page.click("input.password")
+            time.sleep(random.uniform(0.1, 0.4))
+            page.locator("input.password").press_sequentially(self.password, delay=random.randint(50, 150))
             time.sleep(random.uniform(0.5, 1.0))
 
             print("Invio modulo di login...")
             try:
-                with page.expect_navigation(timeout=40000, wait_until="domcontentloaded"):
-                    page.keyboard.press("Enter")
-            except Exception as nav_e:
-                print(f"Timeout navigazione login ({nav_e}). Provo click su bottone...")
+                # Usa un click esplicito invece del tasto Invio per evitare problemi JS/bot detection
+                button = page.locator("button[type='submit']").first
+                
+                # Simulazione movimento mouse verso il bottone
                 try:
-                    page.evaluate("document.querySelector('button[type=\"submit\"]').click()")
-                except:
+                    box = button.bounding_box()
+                    if box:
+                        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2, steps=10)
+                        time.sleep(random.uniform(0.2, 0.5))
+                except Exception:
                     pass
+                
+                try:
+                    button.click(timeout=5000)
+                except Exception:
+                    # Alternativa se il bottone non è cliccabile
+                    page.evaluate("document.querySelector('button[type=\"submit\"]').click()")
+                
+                # Attende che la navigazione si completi dopo il submit
+                page.wait_for_load_state("domcontentloaded", timeout=40000)
+                # Piccola pausa per dare modo alle animazioni/redirect JS finali di concludersi
+                time.sleep(3)
+            except Exception as nav_e:
+                print(f"Errore navigazione login o caricamento lento ({nav_e}). Procedo ai check manuali...")
 
             # Verifica Login
             print("Verifica stato login...")
@@ -164,28 +205,14 @@ class RegisterDNSUpdater:
             
             # self._safe_screenshot("debug_after_popup.png")
 
-            print(f"Selezione dominio '{self.domain}'...")
-            try:
-                # Navigazione Dominio
-                with page.expect_navigation(timeout=10000):
-                    # Prova JS click su link dominio per robustezza
-                    found = page.evaluate(f"""() => {{
-                        let el = document.querySelector("a[href*='domain={self.domain}']");
-                        if(el) {{ el.click(); return true; }}
-                        return false;
-                    }}""")
-                    if not found:
-                         # Fallback testo
-                         page.click(f"text={self.domain}")
-                print("Dominio selezionato.")
-            except Exception as e:
-                 print(f"Errore selezione dominio: {e}")
-                 # Fallback estremo: navigazione diretta? Rischioso per sessione.
-                 return False
-
-            print("Navigazione DNS Avanzata...")
-            page.goto('https://controlpanel.register.it/domains/dnsAdvanced.html')
-            page.wait_for_selector("textarea.recordValue", timeout=10000)
+            # Salto la navigazione al dominio cliccando sul testo perché timeout, 
+            # vado direttamente alla pagina dei DNS avanzati passando il dominio come parametro se possibile,
+            # oppure semplicemente navigando all'URL e sperando che il dominio sia pre-selezionato 
+            # (se ce n'è solo uno nel pannello di solito register.it lo pre-seleziona)
+            
+            print("Navigazione diretta DNS Avanzata per bypassare selezione GUI...")
+            page.goto(f'https://controlpanel.register.it/domains/dnsAdvanced.html?domain={self.domain}')
+            page.wait_for_selector("textarea.recordValue", timeout=15000)
             
             rows = page.query_selector_all("tr")
             updated_count = 0

@@ -3,12 +3,12 @@ import os
 from dotenv import load_dotenv
 
 
-def get_public_ip() -> str: #definisco che la funzione ritornerà una variabile di tipo stringa
+def get_public_ip() -> str:
     """
     Recupera l'indirizzo IP pubblico della macchina effettuando una richiesta a un servizio esterno.
     Returns:
         str: L'indirizzo IP pubblico come stringa.
-    """ # si chiama docstring ed è una buona pratica inserirla per spiegare cosa fa la funzione
+    """
     import requests
     url = 'http://ifconfig.me'
     response = requests.get(url)
